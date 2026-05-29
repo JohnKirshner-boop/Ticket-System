@@ -1,0 +1,6 @@
+RewriteEngine On
+RewriteBase /Ticket-System/
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]

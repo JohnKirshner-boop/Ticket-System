@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Help Desk Ticket System</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <div class="brand-block">
+          <div class="brand-mark">HD</div>
+          <div>
+            <h1>Help Desk Ticket System</h1>
+            <p>Priority Queue and SLA Console</p>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-view-target="dashboard" type="button">Dashboard</button>
+          <button class="nav-item" data-view-target="tickets" type="button">Tickets</button>
+          <button class="nav-item" data-view-target="queues" type="button">Queues</button>
+          <button class="nav-item" data-view-target="sla" type="button">SLA Monitor</button>
+          <button class="nav-item" data-view-target="rules" type="button">Escalation Rules</button>
+          <button class="nav-item" data-view-target="agents" type="button">Agents</button>
+        </nav>
+
+        <div class="sidebar-status" id="connectionStatus">
+          <span class="status-dot"></span>
+          <span id="connectionText">Connecting to backend</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <div class="api-banner hidden" id="apiBanner" role="alert"></div>
+        <p class="save-toast hidden" id="toast" aria-live="polite"></p>
+
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Operations Console</p>
+            <h2 id="pageTitle">Dashboard</h2>
+            <p id="pageSubtitle">Working prototype connected to the PHP/MySQL backend.</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="secondary-button" id="refreshData" type="button">Refresh</button>
+            <button class="primary-button" id="openTicketModal" type="button">New Ticket</button>
+          </div>
+        </header>
+
+        <section class="view active" data-view="dashboard">
+          <section class="metric-grid">
+            <article class="metric-panel">
+              <span class="metric-label">Open Tickets</span>
+              <strong id="openTickets">0</strong>
+              <small>All active requests</small>
+            </article>
+            <article class="metric-panel warning">
+              <span class="metric-label">At Risk SLA</span>
+              <strong id="slaRisk">0</strong>
+              <small>Due within 2 hours</small>
+            </article>
+            <article class="metric-panel danger">
+              <span class="metric-label">Over SLA</span>
+              <strong id="overSla">0</strong>
+              <small>Past response target</small>
+            </article>
+            <article class="metric-panel success">
+              <span class="metric-label">Resolved Today</span>
+              <strong id="resolvedToday">0</strong>
+              <small>Closed requests</small>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Priority Watchlist</p>
+                  <h3>Tickets needing attention</h3>
+                </div>
+              </div>
+              <div class="watchlist" id="watchlist"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Queue Snapshot</p>
+                  <h3>Load by priority</h3>
+                </div>
+              </div>
+              <div class="priority-snapshot" id="prioritySnapshot"></div>
+            </article>
+          </section>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Recent Activity</p>
+                <h3>Service desk timeline</h3>
+              </div>
+            </div>
+            <ul class="timeline" id="dashboardTimeline"></ul>
+          </article>
+        </section>
+
+        <section class="view" data-view="tickets">
+          <section class="ticket-layout">
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Ticket Queue</p>
+                  <h3>Active requests</h3>
+                </div>
+                <div class="filter-row">
+                  <button class="filter-chip active" data-priority-filter="all" type="button">All</button>
+                  <button class="filter-chip" data-priority-filter="Urgent" type="button">Urgent</button>
+                  <button class="filter-chip" data-priority-filter="High" type="button">High</button>
+                  <button class="filter-chip" data-priority-filter="Medium" type="button">Medium</button>
+                  <button class="filter-chip" data-priority-filter="Low" type="button">Low</button>
+                </div>
+              </div>
+
+              <div class="queue-toolbar">
+                <label class="search-field" for="ticketSearch">
+                  Search
+                  <input id="ticketSearch" type="search" placeholder="Ticket, requester, issue, agent" />
+                </label>
+                <label>
+                  Status
+                  <select id="statusFilter">
+                    <option value="all">All statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Escalated">Escalated</option>
+                    <option value="Pending User">Pending User</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ticket</th>
+                      <th>Requester</th>
+                      <th>Agent</th>
+                      <th>Queue</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>SLA</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ticketTable"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <aside class="panel detail-panel">
+              <div class="panel-heading compact">
+                <div>
+                  <p class="eyebrow">Selected Ticket</p>
+                  <h3 id="detailTitle">Select a ticket</h3>
+                </div>
+                <span class="ticket-id" id="detailId">-</span>
+              </div>
+
+              <dl class="detail-list">
+                <div>
+                  <dt>Requester</dt>
+                  <dd id="detailRequester">-</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd id="detailEmail">-</dd>
+                </div>
+                <div>
+                  <dt>Assigned agent</dt>
+                  <dd id="detailAgent">-</dd>
+                </div>
+                <div>
+                  <dt>Assign to agent</dt>
+                  <dd class="assign-row">
+                    <select id="assignAgentSelect" aria-label="Assign agent"></select>
+                    <button class="secondary-button" id="assignAgentBtn" type="button">Save Assignment</button>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Priority</dt>
+                  <dd id="detailPriority">-</dd>
+                </div>
+                <div>
+                  <dt>Queue position</dt>
+                  <dd id="detailQueue">-</dd>
+                </div>
+                <div>
+                  <dt>SLA</dt>
+                  <dd id="detailSla">-</dd>
+                </div>
+                <div>
+                  <dt>Escalation level</dt>
+                  <dd id="detailEscalation">-</dd>
+                </div>
+                <div>
+                  <dt>Description</dt>
+                  <dd id="detailDescription" class="detail-description">-</dd>
+                </div>
+              </dl>
+
+              <div class="action-stack">
+                <button class="primary-button" id="escalateTicket" type="button">Escalate</button>
+                <button class="secondary-button" id="reassignTicket" type="button">Next Agent</button>
+                <button class="secondary-button" id="resolveTicket" type="button">Resolve</button>
+              </div>
+
+              <section class="activity-feed">
+                <div class="panel-heading compact">
+                  <h3>Matching triggers</h3>
+                </div>
+                <ul class="rule-tags" id="matchingRules"></ul>
+              </section>
+
+              <section class="activity-feed">
+                <div class="panel-heading compact">
+                  <h3>Activity log</h3>
+                </div>
+                <ul id="activityLog"></ul>
+              </section>
+            </aside>
+          </section>
+        </section>
+
+        <section class="view" data-view="queues">
+          <section class="queue-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Priority Queues</p>
+                  <h3>Queue numbers by priority</h3>
+                </div>
+              </div>
+              <div class="priority-queue-list" id="priorityQueueCards"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Team Workload</p>
+                  <h3>Active tickets by agent</h3>
+                </div>
+              </div>
+              <div id="workloadBars" class="workload-bars"></div>
+            </article>
+          </section>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Queue Board</p>
+                <h3>Ordered by priority and arrival time</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Priority</th>
+                    <th>Queue #</th>
+                    <th>Ticket</th>
+                    <th>Issue</th>
+                    <th>Agent</th>
+                    <th>SLA</th>
+                  </tr>
+                </thead>
+                <tbody id="queueTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" data-view="sla">
+          <section class="dashboard-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Over SLA</p>
+                  <h3>Past deadline</h3>
+                </div>
+              </div>
+              <div class="watchlist" id="overSlaList"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">At Risk</p>
+                  <h3>Due soon</h3>
+                </div>
+              </div>
+              <div class="watchlist" id="atRiskList"></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="view" data-view="rules">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Escalation Rules</p>
+                <h3>Priority-based triggers</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="rules-table">
+                <thead>
+                  <tr>
+                    <th>Rule</th>
+                    <th>Condition</th>
+                    <th>Action</th>
+                    <th>Owner</th>
+                    <th>SLA</th>
+                  </tr>
+                </thead>
+                <tbody id="rulesTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" data-view="agents">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Agents</p>
+                <h3>Support roster</h3>
+              </div>
+            </div>
+            <div class="roster-grid" id="agentGrid"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="ticket-modal" id="ticketModal">
+      <form id="ticketForm">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Ticket Intake</p>
+            <h3>Create ticket</h3>
+          </div>
+          <button class="icon-button" id="closeTicketModal" aria-label="Close" type="button">x</button>
+        </div>
+
+        <label>
+          Requester
+          <input name="requester_name" required placeholder="Student, faculty, or staff name" />
+        </label>
+        <label>
+          Email
+          <input name="requester_email" type="email" placeholder="name@example.com" />
+        </label>
+        <label>
+          Issue title
+          <input name="title" required placeholder="Short issue summary" />
+        </label>
+        <label>
+          Description
+          <textarea name="description" rows="3" placeholder="Additional details for the assigned agent"></textarea>
+        </label>
+        <label>
+          Category
+          <select name="category">
+            <option>Account Access</option>
+            <option>Network</option>
+            <option>Hardware</option>
+            <option>Software</option>
+            <option>Security</option>
+          </select>
+        </label>
+        <label>
+          Priority
+          <select name="priority">
+            <option>Medium</option>
+            <option>High</option>
+            <option>Urgent</option>
+            <option>Low</option>
+          </select>
+        </label>
+        <label>
+          Assign to
+          <select name="agent_id" id="createAgentSelect">
+            <option value="">Auto assign</option>
+          </select>
+        </label>
+
+        <div class="modal-actions">
+          <button class="secondary-button" id="cancelTicketModal" type="button">Cancel</button>
+          <button class="primary-button" id="submitTicket" type="submit">Create Ticket</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
